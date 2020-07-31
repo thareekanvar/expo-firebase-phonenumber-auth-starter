@@ -12,6 +12,16 @@ export const auth = firebase.auth();
 
 export const logout = () => auth.signOut();
 
+export const firebaseLogin = async ({ verificationId, verificationCode }) => {
+  const credential = firebase.auth.PhoneAuthProvider.credential(
+    verificationId,
+    verificationCode
+  );
+  await firebase.auth().signInWithCredential(credential);
+
+  return true;
+};
+
 export const getVerificationId = async ({
   phoneNumber,
   recaptchaVerifierCurrent,
