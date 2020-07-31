@@ -51,4 +51,4 @@ Main screens:
 
 ## ⚠️⚠️⚠️
 
-thanx to [expo-firebase-starter](https://github.com/expo-community/expo-firebase-starter) ( i have reffed this compononet for more builds )
+thanx to [expo-firebase-starter](https://github.com/expo-community/expo-firebase-starter) ( help me a lot )
