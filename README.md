@@ -12,6 +12,7 @@ Is a quicker way to start with Expo + Firebase projects. It includes:
 - based on Expo SDK `38.x.x`
 - navigation using `react-navigation` 5.x.x
 - Firebase as backend for phone auth
+- Resend OTP with time interval 
 - custom and reusable form components
 - handles different field types in forms
 - handles server errors using Formik
@@ -49,6 +50,5 @@ Main screens:
 - Login
 - Home
 
-## ⚠️⚠️⚠️
 
 thanx to [expo-firebase-starter](https://github.com/expo-community/expo-firebase-starter) ( help me a lot )
