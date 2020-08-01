@@ -1,5 +1,5 @@
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import * as Yup from "yup";
 import {
@@ -27,6 +27,7 @@ const validationSchemaCode = Yup.object().shape({
 });
 
 let RESEND_OTP_TIME_LIMIT = 30;
+let resendOtpTimerInterval;
 
 export default function LoginScreen({ navigation }) {
   const recaptchaVerifier = useRef(null);
@@ -39,14 +40,27 @@ export default function LoginScreen({ navigation }) {
     RESEND_OTP_TIME_LIMIT
   );
 
-  function resendTime() {
-    let time = resendButtonDisabledTime;
-    for (i = 0; i <= time; i++) {
-      time = time - 1;
-      setResendButtonDisabledTime(time);
+  useEffect(() => {
+    startResendOtpTimer();
+
+    return () => {
+      if (resendOtpTimerInterval) {
+        clearInterval(resendOtpTimerInterval);
+      }
+    };
+  }, [resendButtonDisabledTime]);
+
+  function startResendOtpTimer() {
+    if (resendOtpTimerInterval) {
+      clearInterval(resendOtpTimerInterval);
     }
-    setResendButtonDisabledTime(RESEND_OTP_TIME_LIMIT);
-    RESEND_OTP_TIME_LIMIT = RESEND_OTP_TIME_LIMIT + 30;
+    resendOtpTimerInterval = setInterval(() => {
+      if (resendButtonDisabledTime <= 0) {
+        clearInterval(resendOtpTimerInterval);
+      } else {
+        setResendButtonDisabledTime(resendButtonDisabledTime - 1);
+      }
+    }, 1000);
   }
 
   async function handleGetVerificationId(values) {
@@ -59,7 +73,8 @@ export default function LoginScreen({ navigation }) {
       });
       setPhoneNumber(phoneNumber);
       setVerificationId(verificationId);
-      resendTime();
+
+      startResendOtpTimer();
     } catch (error) {
       setCodeError(error.message);
     }
@@ -69,7 +84,6 @@ export default function LoginScreen({ navigation }) {
     const { verificationCode } = values;
     try {
       await firebaseLogin({ verificationCode, verificationId });
-      RESEND_OTP_TIME_LIMIT = 30;
     } catch (error) {
       setLoginError(error.message);
     }
@@ -126,7 +140,7 @@ export default function LoginScreen({ navigation }) {
             </Text>
             <View>
               {resendLoading && <Spinner />}
-              {resendButtonDisabledTime >= 0
+              {resendButtonDisabledTime > 0
                 ? !resendLoading && (
                     <Text style={styles.resendText}>
                       Resend otp in {resendButtonDisabledTime}
@@ -140,6 +154,8 @@ export default function LoginScreen({ navigation }) {
                         let values = { phoneNumber };
                         await handleGetVerificationId(values);
                         setResendLoading(false);
+                        RESEND_OTP_TIME_LIMIT = RESEND_OTP_TIME_LIMIT + 30;
+                        setResendButtonDisabledTime(RESEND_OTP_TIME_LIMIT);
                       }}
                     >
                       Resend otp
