@@ -1,35 +1,56 @@
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import React, { useRef, useState } from "react";
-import { StyleSheet } from "react-native";
-import * as Yup from "yup";
+import React, { useEffect, useRef, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import {
-  getVerificationId,
   firebaseLogin,
+  getVerificationId,
 } from "../components/firebase/firebase";
 import firebaseConfig from "../components/firebase/firebaseConfig";
 import Form from "../components/forms/form";
 import FormButton from "../components/forms/formButton";
 import FormErrorMessage from "../components/forms/formErrorMessage";
 import FormField from "../components/forms/formField";
-import IconButton from "../components/iconButton";
 import SafeView from "../components/safeView";
+import Spinner from "../components/spinner";
 import Colors from "../utils/colors";
+import { validationSchemaPhone, validationSchemaCode } from "../validations";
 
-const phoneRegExp = /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*/g;
-
-const validationSchemaPhone = Yup.object().shape({
-  phoneNumber: Yup.string().matches(phoneRegExp, "Phone number is not valid"),
-});
-
-const validationSchemaCode = Yup.object().shape({
-  verificationCode: Yup.number(),
-});
+let RESEND_OTP_TIME_LIMIT = 30;
+let resendOtpTimerInterval;
 
 export default function LoginScreen({ navigation }) {
   const recaptchaVerifier = useRef(null);
   const [loginError, setLoginError] = useState("");
   const [verificationId, setVerificationId] = useState(null);
   const [codeError, setCodeError] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendButtonDisabledTime, setResendButtonDisabledTime] = useState(
+    RESEND_OTP_TIME_LIMIT
+  );
+
+  useEffect(() => {
+    startResendOtpTimer();
+
+    return () => {
+      if (resendOtpTimerInterval) {
+        clearInterval(resendOtpTimerInterval);
+      }
+    };
+  }, [resendButtonDisabledTime]);
+
+  function startResendOtpTimer() {
+    if (resendOtpTimerInterval) {
+      clearInterval(resendOtpTimerInterval);
+    }
+    resendOtpTimerInterval = setInterval(() => {
+      if (resendButtonDisabledTime <= 0) {
+        clearInterval(resendOtpTimerInterval);
+      } else {
+        setResendButtonDisabledTime(resendButtonDisabledTime - 1);
+      }
+    }, 1000);
+  }
 
   async function handleGetVerificationId(values) {
     const { phoneNumber } = values;
@@ -39,7 +60,10 @@ export default function LoginScreen({ navigation }) {
         phoneNumber,
         recaptchaVerifierCurrent,
       });
+      setPhoneNumber(phoneNumber);
       setVerificationId(verificationId);
+
+      startResendOtpTimer();
     } catch (error) {
       setCodeError(error.message);
     }
@@ -48,9 +72,7 @@ export default function LoginScreen({ navigation }) {
   async function handleLogin(values) {
     const { verificationCode } = values;
     try {
-      let login = await firebaseLogin({ verificationCode, verificationId });
-
-      console.log({ login });
+      await firebaseLogin({ verificationCode, verificationId });
     } catch (error) {
       setLoginError(error.message);
     }
@@ -62,18 +84,12 @@ export default function LoginScreen({ navigation }) {
         ref={recaptchaVerifier}
         firebaseConfig={firebaseConfig}
       />
-      <IconButton
-        style={styles.backButton}
-        iconName="keyboard-backspace"
-        color="#fff"
-        size={30}
-        onPress={() => navigation.goBack()}
-      />
+
       {!verificationId && (
         <Form
           initialValues={{ phoneNumber: "" }}
           validationSchema={validationSchemaPhone}
-          onSubmit={(values) => handleGetVerificationId(values)}
+          onSubmit={async (values) => await handleGetVerificationId(values)}
         >
           <FormField
             name="phoneNumber"
@@ -83,7 +99,6 @@ export default function LoginScreen({ navigation }) {
             keyboardType="phone-pad"
             autoFocus={true}
           />
-
           <FormButton title={"send code"} />
           {<FormErrorMessage error={codeError} visible={true} />}
         </Form>
@@ -92,16 +107,51 @@ export default function LoginScreen({ navigation }) {
         <Form
           initialValues={{ verificationCode: "" }}
           validationSchema={validationSchemaCode}
-          onSubmit={(values) => handleLogin(values)}
+          onSubmit={async (values) => await handleLogin(values)}
         >
           <FormField
             name="verificationCode"
-            leftIcon="phone"
+            leftIcon="textbox-password"
             placeholder="Enter code"
             autoCapitalize="none"
             keyboardType="phone-pad"
             autoFocus={true}
           />
+          <View style={styles.flexRow}>
+            <Text
+              style={styles.resendText}
+              onPress={() => {
+                setVerificationId(null);
+                setPhoneNumber(null);
+              }}
+            >
+              Wrong number?
+            </Text>
+            <View>
+              {resendLoading && <Spinner />}
+              {resendButtonDisabledTime > 0
+                ? !resendLoading && (
+                    <Text style={styles.resendText}>
+                      Resend otp in {resendButtonDisabledTime}
+                    </Text>
+                  )
+                : !resendLoading && (
+                    <Text
+                      style={styles.resendText}
+                      onPress={async () => {
+                        setResendLoading(true);
+                        let values = { phoneNumber };
+                        await handleGetVerificationId(values);
+                        setResendLoading(false);
+                        RESEND_OTP_TIME_LIMIT = RESEND_OTP_TIME_LIMIT + 30;
+                        setResendButtonDisabledTime(RESEND_OTP_TIME_LIMIT);
+                      }}
+                    >
+                      Resend otp
+                    </Text>
+                  )}
+            </View>
+          </View>
 
           <FormButton title={"login"} />
           {<FormErrorMessage error={loginError} visible={true} />}
@@ -127,8 +177,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
-  backButton: {
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
+  resendText: {
+    fontSize: 14,
+    color: Colors.secondary,
+    textAlign: "center",
+  },
+  flexRow: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 10,
   },
 });
