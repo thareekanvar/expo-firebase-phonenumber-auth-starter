@@ -1,30 +1,19 @@
 import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import React, { useRef, useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import * as Yup from "yup";
 import {
-  getVerificationId,
   firebaseLogin,
+  getVerificationId,
 } from "../components/firebase/firebase";
 import firebaseConfig from "../components/firebase/firebaseConfig";
 import Form from "../components/forms/form";
 import FormButton from "../components/forms/formButton";
 import FormErrorMessage from "../components/forms/formErrorMessage";
 import FormField from "../components/forms/formField";
-import IconButton from "../components/iconButton";
 import SafeView from "../components/safeView";
-import Colors from "../utils/colors";
 import Spinner from "../components/spinner";
-
-const phoneRegExp = /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*/g;
-
-const validationSchemaPhone = Yup.object().shape({
-  phoneNumber: Yup.string().matches(phoneRegExp, "Phone number is not valid"),
-});
-
-const validationSchemaCode = Yup.object().shape({
-  verificationCode: Yup.number(),
-});
+import Colors from "../utils/colors";
+import { validationSchemaPhone, validationSchemaCode } from "../validations";
 
 let RESEND_OTP_TIME_LIMIT = 30;
 let resendOtpTimerInterval;
@@ -122,7 +111,7 @@ export default function LoginScreen({ navigation }) {
         >
           <FormField
             name="verificationCode"
-            leftIcon="phone"
+            leftIcon="textbox-password"
             placeholder="Enter code"
             autoCapitalize="none"
             keyboardType="phone-pad"
